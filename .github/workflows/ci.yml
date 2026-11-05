@@ -51,3 +51,31 @@ jobs:
           path: dist/
           retention-days: 7
           if-no-files-found: error
+
+  deploy_demo:
+    needs: package
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: test
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: app-${{ github.sha }}
+          path: deploy/test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Проверка секрета
+        env:
+          DEMO_TOKEN: ${{ secrets.DEMO_TOKEN }}
+        run: test -n "$DEMO_TOKEN"
+      - name: Проверка и запуск приложения
+        working-directory: deploy/test
+        run: |
+          sha256sum -c SHA256SUMS
+          test "$(python calculator.py add 2 3)" = "5.0"
+          printf 'Smoke test passed\n' > deployment.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deployment-${{ github.run_id }}
+          path: deploy/test/deployment.txt
